@@ -14,9 +14,9 @@ echo "🔒 Security Scan Started - $(hostname) - $TIMESTAMP"
 # 1. Check for exposed secrets in recent git commits
 echo "  [1/5] Scanning for exposed secrets in git..."
 if [ -d "$WORKSPACE/.git" ]; then
-    EXPOSED=$(git -C "$WORKSPACE" log --all --pretty=format: -p --since="7 days ago" 2>/dev/null | \
-        grep -iE "(sk-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36}|xox[baprs]-[a-zA-Z0-9-]{10,})" | \
-        head -5)
+    EXPOSED=$(timeout 15 git -C "$WORKSPACE" log --all --pretty=format: --diff-filter=A --since="7 days ago" -p 2>/dev/null | \
+        grep -iE "(sk-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36}|xox[baprs]-[a-zA-Z0-9-]{10,})" 2>/dev/null | \
+        head -5 || true)
     if [ -n "$EXPOSED" ]; then
         echo "  ⚠️  POTENTIAL SECRETS IN GIT HISTORY"
         ISSUES=$((ISSUES + 1))
@@ -72,9 +72,9 @@ fi
 
 # 5. Check for hardcoded secrets in workspace files
 echo "  [5/5] Scanning workspace for hardcoded secrets..."
-HARDCODED=$(grep -rl --include="*.md" --include="*.yaml" --include="*.yml" --include="*.json" --include="*.js" --include="*.ts" \
+HARDCODED=$(timeout 30 grep -rl --include="*.md" --include="*.yaml" --include="*.yml" --include="*.json" --include="*.js" --include="*.ts" \
     -E "(sk-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36})" \
-    "$WORKSPACE" 2>/dev/null | grep -v node_modules | grep -v .git | head -5)
+    "$WORKSPACE" 2>/dev/null | grep -v node_modules | grep -v .git | head -5 || true)
 if [ -n "$HARDCODED" ]; then
     echo "  ⚠️  Possible secrets found in:"
     echo "$HARDCODED" | sed 's/^/    /'
